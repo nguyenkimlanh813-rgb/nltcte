@@ -1,0 +1,906 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>My Little Life - City Life 3D</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;background:#9bd7fa;touch-action:none}
+button{border:0;border-radius:12px;padding:10px 12px;font-weight:bold;background:#fff;color:#24364a;cursor:pointer}
+#game{position:fixed;inset:0}
+#hud{position:fixed;left:8px;top:8px;z-index:4;pointer-events:none;max-width:calc(100% - 16px)}
+.panel{background:#fffffff0;border-radius:13px;padding:9px 11px;box-shadow:0 3px 12px #0002}
+#title{font-weight:900;font-size:15px;margin-bottom:6px}
+#stats{display:flex;gap:5px;flex-wrap:wrap;font-size:11px}
+#stats span{background:#eaf1f7;border-radius:7px;padding:5px}
+#task{font-size:11px;margin-top:6px}
+#menu{position:fixed;right:8px;top:8px;z-index:5;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;width:145px}
+#menu button{font-size:11px;padding:9px 7px;box-shadow:0 2px 6px #0002}
+#joystick{position:fixed;left:18px;bottom:18px;width:112px;height:112px;border:3px solid #ffffffc9;border-radius:50%;background:#ffffff70;z-index:5;touch-action:none}
+#stick{position:absolute;left:31px;top:31px;width:44px;height:44px;border-radius:50%;background:white;border:2px solid #aab7c5}
+#lookpad{position:fixed;right:0;bottom:0;width:43%;height:52%;z-index:2;touch-action:none}
+#looklabel{position:fixed;right:12px;bottom:130px;color:white;font-size:10px;text-shadow:0 1px 5px #000;z-index:3;pointer-events:none}
+#buttons{position:fixed;left:140px;bottom:24px;z-index:5;display:flex;flex-direction:column;gap:7px}
+#buttons button{box-shadow:0 2px 8px #0003}
+#interact{background:#ffe4a2}
+#toast{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);z-index:20;background:#fff;padding:15px 19px;border-radius:15px;display:none;text-align:center;box-shadow:0 5px 20px #0004;max-width:85vw}
+#modal{position:fixed;inset:0;background:#10192788;z-index:15;display:none;align-items:center;justify-content:center;padding:10px}
+#card{background:#f6f8fc;border-radius:18px;padding:16px;width:min(440px,94vw);max-height:88dvh;overflow:auto;color:#24364a;touch-action:pan-y}
+#card h2{font-size:20px;margin:0 0 10px}
+#card h3{font-size:14px;margin:12px 0 6px}
+#card button{margin:3px}
+.job{padding:10px;background:#fff;border-radius:12px;margin:7px 0}
+.small{font-size:12px;color:#657184;line-height:1.5}
+#rotate{position:fixed;inset:0;background:#172c42;color:white;z-index:30;display:none;align-items:center;justify-content:center;text-align:center;padding:25px;font-size:18px}
+#rotate button{margin-top:15px}
+@media(orientation:portrait) and (max-width:700px){
+ #rotate{display:flex}
+ #hud{max-width:calc(100% - 125px)}
+ #menu{width:112px}
+ #menu button{padding:7px 5px;font-size:10px}
+ #buttons{left:130px;bottom:17px}
+}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud" class="panel">
+ <div id="title">🏙️ MY LITTLE LIFE 3D</div>
+ <div id="stats">
+  <span>👤 <b id="name">Alex</b></span>
+  <span>💵 <b id="money">500</b>đ</span>
+  <span>💼 <b id="job">Chưa có việc</b></span>
+  <span>⚡ <b id="energy">100</b>%</span>
+ </div>
+ <div id="task">📍 Khám phá thành phố và tìm công việc!</div>
+</div>
+
+<div id="menu">
+ <button onclick="openJobs()">💼 Nghề nghiệp</button>
+ <button onclick="openShop()">🛍️ Cửa hàng</button>
+ <button onclick="openHome()">🏠 Nhà ở</button>
+ <button onclick="openCharacter()">🧑 Nhân vật</button>
+ <button onclick="rotateScreen()">📱 Nằm ngang</button>
+ <button onclick="saveGame();toast('Đã lưu tiến trình!')">💾 Lưu</button>
+</div>
+
+<div id="joystick"><div id="stick"></div></div>
+<div id="lookpad"></div>
+<div id="looklabel">Vuốt vùng này để xoay camera</div>
+<div id="buttons">
+ <button id="interact" onclick="interact()">👋 TƯƠNG TÁC</button>
+ <button onclick="jump()">⬆️ NHẢY</button>
+</div>
+
+<div id="modal"><div id="card"></div></div>
+<div id="toast"></div>
+<div id="rotate">
+ <div>
+  <div style="font-size:48px">📱 ↻</div>
+  <h2>My Little Life 3D</h2>
+  <p>Hãy xoay điện thoại nằm ngang để chơi thoải mái hơn.</p>
+  <button onclick="rotateScreen()">Thử xoay màn hình</button>
+  <p style="font-size:12px">Nếu điện thoại không tự xoay, hãy bật khóa xoay trong Trung tâm điều khiển.</p>
+ </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const defaults={
+ name:"Alex",money:500,energy:100,job:"Chưa có việc",
+ salary:0,day:1,home:"Chưa thuê nhà",x:0,z:12,
+ shirt:"#4383d8",skin:"#edbd97",hair:"#39251e",
+ pants:"#303e59",shoes:"#f5f5f5",hairStyle:"Ngắn"
+};
+let state;
+try{state={...defaults,...JSON.parse(localStorage.getItem("mll-city")||"{}")}}
+catch(e){state={...defaults}}
+
+function saveGame(){
+ state.x=player.position.x;state.z=player.position.z;
+ try{localStorage.setItem("mll-city",JSON.stringify(state))}catch(e){}
+}
+function toast(s){
+ const el=$("toast");el.textContent=s;el.style.display="block";
+ clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display="none",1900);
+}
+function updateHUD(){
+ $("name").textContent=state.name;
+ $("money").textContent=state.money.toLocaleString("vi-VN");
+ $("job").textContent=state.job;
+ $("energy").textContent=state.energy;
+ $("task").textContent=state.job==="Chưa có việc"
+ ?"📍 Tìm việc, khám phá thành phố và kiếm tiền!"
+ :"🎯 Hãy đến nơi làm việc để thực hiện nhiệm vụ.";
+}
+async function rotateScreen(){
+ try{
+  if(!document.fullscreenElement){
+   await document.documentElement.requestFullscreen();
+  }
+  if(screen.orientation&&screen.orientation.lock){
+   await screen.orientation.lock("landscape");
+  }
+  toast("Đã yêu cầu chế độ nằm ngang!");
+ }catch(e){
+  toast("Hãy xoay điện thoại và tắt khóa xoay màn hình.");
+ }
+}
+
+// Three.js world
+const scene=new THREE.Scene();
+scene.background=new THREE.Color("#a9d9f8");
+scene.fog=new THREE.Fog("#a9d9f8",70,180);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,500);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.shadowMap.enabled=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+$("game").appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xe7f4ff,0x64705c,2));
+const sun=new THREE.DirectionalLight(0xffefcf,2.7);
+sun.position.set(-35,60,35);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-55;sun.shadow.camera.right=55;
+sun.shadow.camera.top=55;sun.shadow.camera.bottom=-55;
+scene.add(sun);
+
+const mats={};
+function mat(c){
+ if(!mats[c])mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.88});
+ return mats[c];
+}
+function box(parent,x,y,z,w,h,d,color,shadow=true){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));
+ m.position.set(x,y,z);m.castShadow=shadow;m.receiveShadow=true;
+ parent.add(m);return m;
+}
+function sphere(parent,x,y,z,r,color,sx=1,sy=1,sz=1){
+ const m=new THREE.Mesh(new THREE.SphereGeometry(r,12,10),mat(color));
+ m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;parent.add(m);
+ return m;
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),mat("#82b778"));
+ground.rotation.x=-Math.PI/2;ground.position.y=-.12;
+ground.receiveShadow=true;scene.add(ground);
+
+// Roads and sidewalks
+box(scene,0,-.04,0,18,.12,290,"#41464d",false);
+for(const x of [-12,12])box(scene,x,0,0,5,.13,290,"#b9b9b4",false);
+for(let z=-140;z<145;z+=11)box(scene,0,.03,z,.18,.025,4,"#f3e2a8",false);
+for(let z=-140;z<140;z+=18){
+ for(const x of [-9,9])box(scene,x,.02,z,1.5,.03,1.5,"#e9e6dc",false);
+}
+
+// Building system
+const places=[];
+function building(name,type,x,z,w,d,h,color,signColor){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(g,0,h/2,0,w,h,d,color);
+ box(g,0,h+.12,0,w+.4,.24,d+.4,"#c8d0d6");
+ // Windows on the front facade
+ for(let y=1.6;y<h-1;y+=2.6){
+  for(let xx=-w/2+1;xx<w/2-.6;xx+=2.2){
+   box(g,xx,y,d/2+.035,1.1,1.35,.07,
+    (Math.floor(xx+y)%3===0)?"#d3eafa":"#77a8c6",false);
+  }
+ }
+ box(g,0,2.25,d/2+.08,w*.73,.65,.12,signColor,false);
+ box(g,0,.95,d/2+.10,1.15,1.9,.12,"#485969",false);
+ places.push({name,type,x,z,w,d,g});
+ return g;
+}
+
+// More city blocks
+building("Công ty","office",-23,-25,13,12,19,"#a9bfcc","#316d9e");
+building("Văn phòng","office",23,-25,13,12,15,"#9cbbc9","#356d9e");
+building("Siêu thị","market",-23,2,12,12,9,"#e6d4b7","#d47d42");
+building("Cửa hàng","shop",23,2,12,12,8,"#e7b9d6","#bc5d99");
+building("Quán trà sữa","bubble",-23,28,11,11,7,"#d9b2d0","#9c568f");
+building("Quán xiên que","skewers",23,28,11,11,6,"#e7b18b","#bd6337");
+building("Bãi xe ôm","ride",0,48,13,10,5,"#c6d4db","#377f9b");
+building("Kho giao hàng","delivery",0,-52,15,12,9,"#c4c8cc","#4e697a");
+building("Chung cư","home",-25,58,13,12,20,"#a4b5d1","#4c6592");
+building("Khách sạn","hotel",25,58,14,13,22,"#c9c0b2","#877044");
+building("Nhà thuốc","shop",-42,-25,10,10,7,"#d1e4dc","#47896f");
+building("Tiệm bánh","shop",42,-25,10,10,7,"#f0d2a9","#a66a40");
+building("Cửa hàng tiện lợi","market",-42,3,10,10,6,"#c5dce9","#3984ac");
+building("Phòng gym","shop",42,3,11,11,10,"#b8b6d3","#615b94");
+building("Trường học","office",-42,33,12,12,11,"#e5d5b5","#b57d43");
+building("Thư viện","shop",42,33,12,12,12,"#b9cbbd","#477e5e");
+  
+/* CÁC ĐỊA ĐIỂM NGHỀ NGHIỆP BỔ SUNG */
+building("Điểm nhận đơn hàng","pickup",0,-78,15,12,8,
+ "#b7cbd8","#267aa8");
+
+building("Điểm giao hàng","dropoff",0,78,13,11,7,
+ "#d8c7a7","#a86d36");
+
+building("Bãi đỗ xe giao hàng","ride",17,-48,13,10,5,
+ "#b9c8d0","#397c9c");
+
+building("Trung tâm tuyển dụng","recruit",0,96,15,12,9,
+ "#b4c5dc","#365c91");
+
+
+// Decorative houses in rows
+for(let row=0;row<5;row++){
+ for(let side of [-1,1]){
+  const z=-95+row*36;
+  const x=side*(38+(row%2)*7);
+  const w=9+(row%3);
+  const h=6+(row%4)*1.5;
+  const colors=["#d5c0a8","#b5cbd5","#d7b5b0","#c9d3b5","#d5c9df"];
+  box(scene,x,h/2,z,w,h,9,colors[(row+(side===1?1:0))%colors.length]);
+  box(scene,x,h+.15,z,w+.3,.3,9.3,"#6b7079");
+  for(let wx=-w/2+1;wx<w/2;wx+=2.4){
+   box(scene,x+wx,2,z+4.55,1,1.3,.08,"#a9d8ed",false);
+  }
+  box(scene,x,1,z+4.65,1.1,2,.12,"#795f4d",false);
+ }
+}
+
+// Street lights
+for(let z=-120;z<130;z+=18){
+ for(const x of [-11,11]){
+  box(scene,x,2.1,z,.14,4.2,.14,"#555e67");
+  box(scene,x,4.15,z,.8,.13,.35,"#fff0b8");
+ }
+}
+
+// Trees, parked cars and motorcycles
+for(let z=-130;z<140;z+=12){
+ for(const x of [-31,31]){
+  box(scene,x,.8,z,.35,1.6,.35,"#76503a");
+  sphere(scene,x,2.3,z,1.15,"#428455",1,1.1,1);
+ }
+}
+function vehicle(x,z,color,motor=false){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(g,0,.6,0,motor?.55:1.8,motor?.6:.85,motor?1.1:3.3,color);
+ if(!motor)box(g,0,1.12,-.15,1.35,.55,1.65,"#8ed2eb");
+ const wheelX=motor?.32:.95;
+ const wheelZ=motor?.4:1.05;
+ for(const a of [-1,1])for(const b of [-1,1]){
+  if(motor&&b===1)continue;
+  const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,.16,12),mat("#292d32"));
+  wheel.rotation.z=Math.PI/2;
+  wheel.position.set(a*wheelX,.27,b*wheelZ);g.add(wheel);
+ }
+ return g;
+}
+vehicle(-7,-2,"#d84949");
+vehicle(7,8,"#e8e8e8");
+vehicle(-7,36,"#397fbe");
+vehicle(6,-43,"#e5b447");
+vehicle(-4,47,"#3b9c7b",true);
+vehicle(4,47,"#d8d8d8",true);
+
+// Park
+for(let i=0;i<15;i++){
+ const x=30+Math.random()*12,z=82+Math.random()*20;
+ sphere(scene,x,1.2,z,.85,"#48915a",1,1.2,1);
+ box(scene,x,.6,z,.18,1.2,.18,"#77553c");
+}
+
+// Player
+const player=new THREE.Group();scene.add(player);
+const avatar=new THREE.Group();player.add(avatar);
+function rebuildAvatar(){
+ avatar.clear();
+ const skin=state.skin,shirt=state.shirt;
+ const pants=state.pants,shoes=state.shoes,hair=state.hair;
+ for(const side of [-1,1]){
+  const leg=new THREE.Group();leg.position.set(side*.2,.78,0);avatar.add(leg);
+  box(leg,0,-.22,0,.23,.58,.28,pants);
+  box(leg,0,-.55,.07,.29,.16,.42,shoes);
+  const arm=new THREE.Group();arm.position.set(side*.42,1.58,0);avatar.add(arm);
+  box(arm,0,-.22,0,.19,.5,.22,shirt);
+  sphere(arm,0,-.49,0,.11,skin);
+ }
+ box(avatar,0,1.37,0,.65,.72,.37,shirt);
+ sphere(avatar,0,1.85,0,.32,skin,1,.98,.9);
+ // Face
+ for(const s of [-1,1]){
+  sphere(avatar,s*.115,1.89,.284,.032,"#282b30");
+  box(avatar,s*.115,1.96,.28,.09,.025,.025,hair);
+ }
+ sphere(avatar,0,1.82,.3,.025,"#bd8c71");
+ box(avatar,0,1.75,.295,.09,.02,.02,"#9b5054");
+ if(state.hairStyle==="Dài"){
+  sphere(avatar,0,2.04,-.01,.34,hair,1,.5,1);
+  box(avatar,-.28,1.82,-.01,.12,.62,.19,hair);
+  box(avatar,.28,1.82,-.01,.12,.62,.19,hair);
+ }else if(state.hairStyle==="Xoăn"){
+  sphere(avatar,0,2.05,0,.34,hair,1,.5,1);
+  for(let i=0;i<7;i++){
+   const a=i*Math.PI*2/7;
+   sphere(avatar,Math.cos(a)*.25,2.05,Math.sin(a)*.18,.13,hair);
+  }
+ }else if(state.hairStyle==="Buộc cao"){
+  sphere(avatar,0,2.04,0,.34,hair,1,.5,1);
+  sphere(avatar,0,2.25,-.12,.15,hair);
+ }else{
+  sphere(avatar,0,2.04,0,.34,hair,1,.48,1);
+ }
+ box(avatar,0,2.02,.2,.4,.12,.18,hair);
+}
+rebuildAvatar();
+player.position.set(Number(state.x)||0,0,Number(state.z)||12);
+
+// NPCs
+  
+/* NGƯỜI ĐI BỘ TRÊN VỈA HÈ */
+const pedestrians=[];
+
+function createPedestrian(x,z,color,direction){
+ const g=new THREE.Group();
+ g.position.set(x,0,z);
+ scene.add(g);
+
+ const torso=box(g,0,1.12,0,.42,.65,.27,color);
+ sphere(g,0,1.62,0,.22,"#e8b995");
+
+ box(g,0,1.78,0,.43,.12,.43,"#44352b");
+
+ const legs=[];
+ for(const side of [-1,1]){
+   const leg=box(g,side*.11,.57,0,.13,.48,.15,
+     "#34445b");
+   legs.push(leg);
+ }
+
+ pedestrians.push({
+   g,legs,
+   direction,
+   originX:x,
+   originZ:z,
+   phase:Math.random()*Math.PI*2,
+   speed:1.0+Math.random()*.5
+ });
+}
+
+for(let i=0;i<28;i++){
+ const z=-100+i*7;
+ createPedestrian(
+   i%2===0?-10.1:10.1,
+   z,
+   ["#d96c75","#477eb7","#55a17c",
+    "#bd8c52","#866db7"][i%5],
+   i%2===0?1:-1
+ );
+}
+
+function updatePedestrians(now,dt){
+ for(const p of pedestrians){
+   p.g.position.z+=p.direction*p.speed*dt;
+
+   if(p.g.position.z>115)p.g.position.z=-115;
+   if(p.g.position.z<-115)p.g.position.z=115;
+
+   const step=Math.sin(now*.008*p.speed+p.phase);
+   p.legs[0].position.y=.57+step*.09;
+   p.legs[1].position.y=.57-step*.09;
+   p.g.rotation.y=p.direction===1?0:Math.PI;
+ }
+}
+
+const npcs=[];
+function npc(name,x,z,color){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(g,0,1.1,0,.6,.8,.4,color);
+ sphere(g,0,1.7,0,.27,"#edbd97");
+ box(g,0,1.9,0,.53,.13,.5,"#43362c");
+ npcs.push({name,x,z,g});
+}
+npc("Quản lý công ty",-16,-16,"#2c4b80");
+npc("Chủ quán trà sữa",-16,35,"#b05291");
+npc("Chủ quán xiên que",16,35,"#d26d38");
+npc("Điều phối giao hàng",0,-44,"#3d6f9d");
+npc("Điều phối xe ôm",0,43,"#287e77");
+
+ 
+/* HỆ THỐNG MŨI TÊN CHỈ ĐƯỜNG 3D */
+const navArrow = new THREE.Group();
+scene.add(navArrow);
+
+const arrowPole = new THREE.Mesh(
+  new THREE.CylinderGeometry(.055,.055,.8,8),
+  mat("#fff2a0")
+);
+arrowPole.position.y=2.8;
+navArrow.add(arrowPole);
+
+const arrowHead = new THREE.Mesh(
+  new THREE.ConeGeometry(.42,.85,8),
+  mat("#ffcc37")
+);
+arrowHead.position.y=3.45;
+navArrow.add(arrowHead);
+
+const arrowBase = new THREE.Mesh(
+  new THREE.TorusGeometry(.55,.06,8,24),
+  mat("#ffffff")
+);
+arrowBase.rotation.x=Math.PI/2;
+arrowBase.position.y=2.1;
+navArrow.add(arrowBase);
+
+const navLabel = document.createElement("div");
+navLabel.style.cssText=
+ "position:fixed;left:50%;top:18%;transform:translateX(-50%);"+
+ "background:#fff;padding:8px 13px;border-radius:12px;"+
+ "font:bold 13px Arial;z-index:4;pointer-events:none;"+
+ "box-shadow:0 3px 10px #0003;text-align:center";
+document.body.appendChild(navLabel);
+
+function getNavigationTarget(){
+ // Khi giao hàng, phải lấy đơn trước rồi mới đi giao.
+ if(state.job==="Giao hàng"){
+   const name=state.orderActive
+     ?"Điểm giao hàng":"Điểm nhận đơn hàng";
+   return places.find(p=>p.name===name);
+ }
+
+ if(state.job==="Tài xế xe ôm")
+   return places.find(p=>p.name==="Bãi xe ôm");
+
+ if(state.job==="Bán trà sữa")
+   return places.find(p=>p.name==="Quán trà sữa");
+
+ if(state.job==="Bán xiên que")
+   return places.find(p=>p.name==="Quán xiên que");
+
+ if(state.job==="Nhân viên văn phòng")
+   return places.find(p=>p.name==="Công ty");
+
+ if(state.job==="Nhân viên siêu thị")
+   return places.find(p=>p.name==="Siêu thị");
+
+ if(state.job==="Chưa có việc")
+   return places.find(p=>p.name==="Trung tâm tuyển dụng");
+
+ if(state.home==="Chưa thuê nhà")
+   return places.find(p=>p.name==="Chung cư");
+
+ return places.find(p=>p.name==="Cửa hàng thời trang");
+}
+
+function updateNavigation(now){
+ const target=getNavigationTarget();
+
+ if(!target){
+   navArrow.visible=false;
+   navLabel.textContent="📍 Khám phá thành phố";
+   return;
+ }
+
+ navArrow.visible=true;
+ navArrow.position.set(target.x,0,target.z);
+ navArrow.rotation.y=0;
+ navArrow.position.y=.18+Math.sin(now*.004)*.13;
+
+ const distance=Math.round(Math.hypot(
+   player.position.x-target.x,
+   player.position.z-target.z
+ ));
+
+ const p=target.name;
+ navLabel.textContent=
+   "🧭 "+p+" · Còn "+distance+" m";
+
+ // Hiển thị hướng đi trên bản đồ 3D.
+ const dx=target.x-player.position.x;
+ const dz=target.z-player.position.z;
+ navArrow.rotation.y=Math.atan2(dx,dz);
+}
+
+  // Movement and camera
+const keys={};
+addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+const joy=$("joystick"),stick=$("stick");
+let jx=0,jy=0,drag=false;
+joy.addEventListener("pointerdown",e=>{
+ drag=true;joy.setPointerCapture(e.pointerId);moveJoy(e);
+});
+joy.addEventListener("pointermove",e=>{if(drag)moveJoy(e)});
+function moveJoy(e){
+ const r=joy.getBoundingClientRect();
+ let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;
+ const l=Math.hypot(x,y),max=34;
+ if(l>max){x=x*max/l;y=y*max/l}
+ jx=x/max;jy=y/max;
+ stick.style.left=(31+x)+"px";stick.style.top=(31+y)+"px";
+}
+function resetJoy(){
+ drag=false;jx=jy=0;stick.style.left="31px";stick.style.top="31px";
+}
+joy.addEventListener("pointerup",resetJoy);
+joy.addEventListener("pointercancel",resetJoy);
+
+// Swipe to rotate camera
+const look=$("lookpad");
+let looking=false,lastX=0,lastY=0;
+let yaw=0,pitch=.25;
+look.addEventListener("pointerdown",e=>{
+ looking=true;lastX=e.clientX;lastY=e.clientY;
+ look.setPointerCapture(e.pointerId);
+});
+look.addEventListener("pointermove",e=>{
+ if(!looking)return;
+ yaw-=(e.clientX-lastX)*.008;
+ pitch=clamp(pitch+(e.clientY-lastY)*.005,-.15,.9);
+ lastX=e.clientX;lastY=e.clientY;
+});
+function stopLook(){looking=false}
+look.addEventListener("pointerup",stopLook);
+look.addEventListener("pointercancel",stopLook);
+
+// Jump
+let jumpTime=0;
+function jump(){jumpTime=.55;toast("Nhảy!")}
+window.jump=jump;
+
+let last=performance.now(),autosave=0;
+function animate(now){
+ requestAnimationFrame(animate);
+ const dt=Math.min((now-last)/1000,.04);last=now;
+ let x=jx+(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+ let z=jy+(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+ const len=Math.hypot(x,z);
+ if(len>.05){
+  x/=len;z/=len;
+  const speed=6;
+  player.position.x+=(x*Math.cos(yaw)+z*Math.sin(yaw))*speed*dt;
+  player.position.z+=(-x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+  player.rotation.y=Math.atan2(
+   x*Math.cos(yaw)+z*Math.sin(yaw),
+   -x*Math.sin(yaw)+z*Math.cos(yaw)
+  );
+ }
+ player.position.x=clamp(player.position.x,-55,55);
+ player.position.z=clamp(player.position.z,-135,135);
+ if(jumpTime>0){
+  jumpTime-=dt;
+  avatar.position.y=Math.sin((.55-jumpTime)/.55*Math.PI)*1.1;
+ }else avatar.position.y=0;
+
+ // Orbit-style follow camera
+ const dist=10;
+ const horizontal=Math.cos(pitch)*dist;
+ const target=new THREE.Vector3(
+ player.position.x+Math.sin(yaw)*horizontal,
+ player.position.y+3+Math.sin(pitch)*dist,
+ player.position.z+Math.cos(yaw)*horizontal
+ );
+ camera.position.lerp(target,1-Math.exp(-4*dt));
+ camera.lookAt(player.position.x,1.25,player.position.z);
+
+ renderer.render(scene,camera);
+ autosave+=dt;
+ if(autosave>8){saveGame();autosave=0}
+}
+requestAnimationFrame(animate);
+
+// Jobs: each one has its own workplace and task
+  
+const jobs=[
+ {name:"Giao hàng",salary:300,place:"Kho giao hàng",
+  desc:"Lấy đơn tại Điểm nhận đơn hàng rồi giao đến khách."},
+ {name:"Bán trà sữa",salary:250,place:"Quán trà sữa",
+  desc:"Pha chế và bán trà sữa cho khách."},
+ {name:"Bán xiên que",salary:280,place:"Quán xiên que",
+  desc:"Chuẩn bị và bán xiên que."},
+ {name:"Tài xế xe ôm",salary:320,place:"Bãi xe ôm",
+  desc:"Đón khách và thực hiện chuyến xe."},
+ {name:"Nhân viên văn phòng",salary:350,place:"Công ty",
+  desc:"Làm việc tại văn phòng."},
+ {name:"Nhân viên siêu thị",salary:200,place:"Siêu thị",
+  desc:"Sắp xếp hàng hóa và phục vụ khách."}
+];
+
+const jobs=[
+ {name:"Giao hàng",salary:300,place:"Kho giao hàng",desc:"Nhận đơn và giao hàng đến khách."},
+ {name:"Bán trà sữa",salary:250,place:"Quán trà sữa",desc:"Chuẩn bị và bán trà sữa cho khách."},
+ {name:"Bán xiên que",salary:280,place:"Quán xiên que",desc:"Chuẩn bị xiên que và phục vụ khách."},
+ {name:"Tài xế xe ôm",salary:320,place:"Bãi xe ôm",desc:"Đón khách và chở khách đến nơi."},
+ {name:"Nhân viên văn phòng",salary:350,place:"Công ty",desc:"Hoàn thành công việc văn phòng."},
+ {name:"Nhân viên siêu thị",salary:200,place:"Siêu thị",desc:"Sắp xếp hàng hóa và phục vụ khách."}
+];
+const modal=$("modal"),card=$("card");
+function open(html){card.innerHTML=html;modal.style.display="flex"}
+function close(){modal.style.display="none"}
+modal.addEventListener("click",e=>{if(e.target===modal)close()});
+
+function openJobs(){
+ open(`<h2>💼 Chọn công việc</h2>
+ <p class="small">Nhận việc, đến đúng địa điểm và nhấn TƯƠNG TÁC để làm nhiệm vụ nhận lương.</p>
+ ${jobs.map((j,i)=>`<div class="job">
+ <b>${["🛵","🧋","🍢","🏍️","🏢","🛒"][i]} ${j.name}</b>
+ <p class="small">${j.desc}</p>
+ <p>💵 Lương: <b>${j.salary}đ/lượt</b></p>
+ <button onclick="chooseJob(${i})">${state.job===j.name?"Đang làm":"Nhận việc"}</button>
+ </div>`).join("")}
+ <button onclick="close()">Đóng</button>`);
+}
+function chooseJob(i){state.orderActive=false
+  function chooseJob(i){
+ const j=jobs[i];
+ state.job=j.name;
+ state.salary=j.salary;
+ state.workplace=j.place;
+ state.orderActive=false;
+ saveGame();
+ updateHUD();
+ close();
+ toast("Đã nhận việc: "+j.name);
+}
+ const j=jobs[i];state.job=j.name;state.salary=j.salary;
+ state.workplace=j.place;
+ saveGame();updateHUD();close();
+ toast("Đã nhận việc: "+j.name);
+}
+
+// Character customization
+function openCharacter(){
+ const colors=["#edbd97","#f5d4bd","#c68a61","#875536"];
+ const hairColors=["#39251e","#171719","#75462b","#c18b4d","#a9a9b1"];
+ const shirts=["#4383d8","#e96e96","#49a47b","#e5a64d","#f4f4f4","#383c48","#8b70c9"];
+ open(`<h2>🧑 Nhân vật</h2>
+ <label style="display:block;margin:8px 0">Tên
+ <input id="nm" maxlength="18" value="${escapeHTML(state.name)}" style="padding:9px;width:100%;border-radius:9px;border:1px solid #ccc">
+ </label>
+ <h3>Màu da</h3>${colorButtons(colors,state.skin,"skin")}
+ <h3>Màu tóc</h3>${colorButtons(hairColors,state.hair,"hair")}
+ <h3>Kiểu tóc</h3>
+ ${["Ngắn","Dài","Xoăn","Buộc cao"].map(v=>`<button onclick="setHairStyle('${v}')">${v}</button>`).join("")}
+ <h3>Áo</h3>${colorButtons(shirts,state.shirt,"shirt")}
+ <h3>Quần</h3>${colorButtons(["#303e59","#292d38","#66834b","#e8d8c0","#654a42"],state.pants,"pants")}
+ <h3>Giày</h3>${colorButtons(["#f5f5f5","#242832","#c94343","#a47b52"],state.shoes,"shoes")}
+ <p><button onclick="saveCharacter()">Lưu thay đổi</button>
+ <button onclick="close()">Đóng</button></p>`);
+}
+function escapeHTML(s){
+ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function colorButtons(arr,selected,key){
+ return `<div style="display:flex;gap:8px;flex-wrap:wrap">${arr.map(c=>
+ `<button aria-label="${c}" onclick="setColor('${key}','${c}')" style="width:33px;height:33px;padding:0;border-radius:50%;background:${c};border:${selected===c?'3px solid #3888ef':'2px solid white'}"></button>`
+ ).join("")}</div>`;
+}
+function setColor(k,c){
+ state[k]=c;rebuildAvatar();openCharacter();
+}
+function setHairStyle(v){
+ state.hairStyle=v;rebuildAvatar();openCharacter();
+}
+function saveCharacter(){
+ const n=$("nm").value.trim();if(n)state.name=n;
+ saveGame();updateHUD();close();toast("Đã lưu nhân vật!");
+}
+
+// Shop
+function openShop(){
+ const items=[
+ ["Áo khoác",180,"shirt","#383c48"],
+ ["Áo tím",120,"shirt","#8b70c9"],
+ ["Áo hồng",130,"shirt","#e96e96"],
+ ["Quần mới",160,"pants","#292d38"],
+ ["Giày thể thao",220,"shoes","#c94343"]
+ ];
+ open(`<h2>🛍️ Cửa hàng</h2><p>💵 Bạn có ${state.money}đ</p>
+ ${items.map(([n,c,k,v])=>`<div class="job"><b>${n}</b> — ${c}đ
+ <p><button onclick="buy('${k}','${v}',${c})">Mua và mặc</button></p></div>`).join("")}
+ <button onclick="close()">Đóng</button>`);
+}
+function buy(k,v,c){
+ if(state.money<c){toast("Bạn chưa đủ tiền!");return}
+ state.money-=c;state[k]=v;rebuildAvatar();saveGame();updateHUD();openShop();
+}
+
+// Housing and rest
+function openHome(){
+ open(`<h2>🏠 Nhà ở</h2><p>Hiện tại: ${state.home}</p>
+ <div class="job"><b>Thuê phòng</b><p>200đ mỗi ngày</p>
+ <button onclick="rent()">Thuê phòng</button></div>
+ <div class="job"><b>Mua căn hộ</b><p>5.000đ</p>
+ <button onclick="apartment()">Mua căn hộ</button></div>
+ <button onclick="rest()">😴 Nghỉ ngơi</button>
+ <button onclick="close()">Đóng</button>`);
+}
+function rent(){
+ if(state.money<200){toast("Không đủ tiền!");return}
+ state.money-=200;state.home="Đã thuê phòng";saveGame();updateHUD();openHome();
+}
+function apartment(){
+ if(state.money<5000){toast("Cần 5000đ!");return}
+ state.money-=5000;state.home="Sở hữu căn hộ";saveGame();updateHUD();openHome();
+}
+function rest(){
+ if(state.home==="Chưa thuê nhà"){toast("Hãy thuê phòng trước!");return}
+ if(state.home==="Đã thuê phòng")state.money=Math.max(0,state.money-200);
+ state.energy=100;state.day++;saveGame();updateHUD();close();
+ toast("Ngày mới! Năng lượng đã hồi phục.");
+}
+
+// Interactions
+  
+function interact(){
+ const p=player.position;
+
+ const n=npcs.find(a=>
+   Math.hypot(p.x-a.x,p.z-a.z)<4
+ );
+
+ if(n){
+   open(`<h2>👋 ${escapeHTML(n.name)}</h2>
+   <p>Xin chào ${escapeHTML(state.name)}!</p>
+   <button onclick="close()">Tạm biệt</button>`);
+   return;
+ }
+
+ const b=places.find(a=>
+   Math.hypot(p.x-a.x,p.z-a.z)<
+   Math.max(a.w,a.d)/2+4
+ );
+
+ if(!b){
+   toast("Hãy đi đến gần địa điểm có biển chỉ dẫn!");
+   return;
+ }
+
+ if(b.type==="recruit"){
+   openJobs();
+   return;
+ }
+
+ if(b.type==="home"){
+   openHome();
+   return;
+ }
+
+ if(b.type==="shop"||b.type==="market"){
+   openShop();
+   return;
+ }
+
+ // Quy trình giao hàng: nhận đơn -> giao đơn.
+ if(state.job==="Giao hàng"){
+   if(b.name==="Điểm nhận đơn hàng"){
+     if(state.orderActive){
+       toast("Bạn đã có đơn hàng! Hãy đi giao đơn.");
+       return;
+     }
+
+     state.orderActive=true;
+     saveGame();
+
+     open(`<h2>📦 ĐÃ NHẬN ĐƠN</h2>
+       <p>Bạn đã nhận được một gói hàng.</p>
+       <p>🧭 Đi theo mũi tên đến Điểm giao hàng.</p>
+       <button onclick="close()">Bắt đầu giao</button>`);
+     return;
+   }
+
+   if(b.name==="Điểm giao hàng"){
+     if(!state.orderActive){
+       toast("Bạn cần lấy đơn hàng trước!");
+       return;
+     }
+
+     const pay=state.salary||300;
+     state.money+=pay;
+     state.energy=Math.max(0,state.energy-15);
+     state.orderActive=false;
+     state.experience=(state.experience||0)+1;
+
+     saveGame();
+     updateHUD();
+
+     open(`<h2>🎉 GIAO HÀNG THÀNH CÔNG</h2>
+       <p>📦 Bạn đã giao hàng cho khách.</p>
+       <p>💵 Tiền công: <b>+${pay}đ</b></p>
+       <button onclick="close()">Nhận đơn tiếp</button>`);
+     return;
+   }
+ }
+
+ // Các nghề làm tại địa điểm riêng.
+ const matchingPlace={
+   "Bán trà sữa":"Quán trà sữa",
+   "Bán xiên que":"Quán xiên que",
+   "Tài xế xe ôm":"Bãi xe ôm",
+   "Nhân viên văn phòng":"Công ty",
+   "Nhân viên siêu thị":"Siêu thị"
+ };
+
+ if(state.job==="Chưa có việc"){
+   openJobs();
+   return;
+ }
+
+ if(matchingPlace[state.job]===b.name){
+   if(state.energy<20){
+     toast("Bạn đang mệt! Hãy nghỉ ngơi.");
+     return;
+   }
+
+   const pay=state.salary||200;
+   state.money+=pay;
+   state.energy=Math.max(0,state.energy-20);
+   state.experience=(state.experience||0)+1;
+
+   saveGame();
+   updateHUD();
+
+   open(`<h2>💵 HOÀN THÀNH CÔNG VIỆC</h2>
+     <p>💼 Nghề: ${escapeHTML(state.job)}</p>
+     <p>Thu nhập: <b>+${pay}đ</b></p>
+     <button onclick="close()">Tiếp tục</button>`);
+   return;
+ }
+
+ toast("Hãy đi đến nơi làm việc theo mũi tên!");
+}
+window.interact=interact;
+
+function interact(){
+ const p=player.position;
+ const n=npcs.find(a=>Math.hypot(p.x-a.x,p.z-a.z)<4);
+ if(n){
+  open(`<h2>👋 ${n.name}</h2><p>Xin chào ${escapeHTML(state.name)}! Chúc bạn một ngày tốt lành.</p><button onclick="close()">Tạm biệt</button>`);
+  return;
+ }
+ const b=places.find(a=>
+  Math.hypot(p.x-a.x,p.z-a.z)<Math.max(a.w,a.d)/2+4
+ );
+ if(!b){toast("Hãy đến gần tòa nhà hoặc người dân!");return}
+ if(b.type==="home"){openHome();return}
+ if(b.type==="shop"||b.type==="market"){openShop();return}
+ if(b.type==="office"||b.type==="bubble"||b.type==="skewers"||b.type==="delivery"||b.type==="ride"){
+  if(state.job==="Chưa có việc"){openJobs();return}
+  if(state.workplace!==b.name){
+   toast("Bạn cần đến nơi làm việc: "+state.workplace);return;
+  }
+  if(state.energy<20){toast("Bạn quá mệt! Hãy nghỉ ngơi.");return}
+  state.money+=state.salary;state.energy=Math.max(0,state.energy-20);
+  state.experience=(state.experience||0)+1;
+  saveGame();updateHUD();
+  open(`<h2>🎉 Hoàn thành nhiệm vụ!</h2>
+  <p>💼 Nghề: ${escapeHTML(state.job)}</p>
+  <p>💵 Tiền công: <b>+${state.salary}đ</b></p>
+  <p>⭐ Kinh nghiệm: ${state.experience}</p>
+  <p class="small">Bạn có thể tiếp tục làm việc để kiếm thêm tiền.</p>
+  <button onclick="close()">Tiếp tục</button>`);
+  return;
+ }
+ toast("Bạn đang khám phá "+b.name);
+}
+window.openJobs=openJobs;window.openShop=openShop;window.openHome=openHome;
+window.openCharacter=openCharacter;window.saveGame=saveGame;
+window.rotateScreen=rotateScreen;window.interact=interact;
+window.close=close;window.chooseJob=chooseJob;window.setColor=setColor;
+window.setHairStyle=setHairStyle;window.saveCharacter=saveCharacter;
+window.buy=buy;window.rent=rent;window.apartment=apartment;window.rest=rest;
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+updateHUD();
+})();
+</script>
+</body>
+</html>
